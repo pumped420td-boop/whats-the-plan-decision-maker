@@ -4,6 +4,7 @@ import {
   Dimensions,
   FlatList,
   Keyboard,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -22,6 +23,7 @@ import { useColors } from '@/hooks/useColors';
 
 type Category = 'meals' | 'exercise' | 'weekends';
 type MealKey = 'breakfast' | 'lunch' | 'dinner' | 'custom';
+type MenuSection = 'overview' | 'privacy' | 'terms' | 'support' | 'playStore';
 
 type WheelConfig = {
   id: string;
@@ -336,6 +338,8 @@ export default function Index() {
   const [result, setResult] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [lastResult, setLastResult] = useState<{ label: string; value: string } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuSection, setMenuSection] = useState<MenuSection>('overview');
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -404,6 +408,17 @@ export default function Index() {
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
   const emptyCustom = category === 'meals' && meal === 'custom' && config.choices.length === 0;
+  const menuItems: Array<{ id: MenuSection; label: string; icon: keyof typeof Feather.glyphMap }> = [
+    { id: 'overview', label: 'About the app', icon: 'info' },
+    { id: 'privacy', label: 'Privacy & data', icon: 'shield' },
+    { id: 'terms', label: 'Terms of use', icon: 'file-text' },
+    { id: 'support', label: 'Support & contact', icon: 'help-circle' },
+    { id: 'playStore', label: 'Google Play checklist', icon: 'check-circle' },
+  ];
+  const activeMenuTitle = menuItems.find((item) => item.id === menuSection)?.label ?? 'App menu';
+  const openMenuSection = (section: MenuSection) => {
+    setMenuSection(section);
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -422,9 +437,17 @@ export default function Index() {
               <Text style={styles.heading}>What’s the plan?</Text>
               <Text style={styles.subheading}>Take the decision out of your hands.</Text>
             </View>
-            <View style={[styles.headerBadge, { backgroundColor: colors.surfaceRaised }]}>
-              <Feather name="zap" size={17} color={colors.primary} />
-            </View>
+            <Pressable
+              testID="app-menu-button"
+              accessibilityLabel="Open app menu"
+              onPress={() => {
+                setMenuSection('overview');
+                setMenuOpen(true);
+              }}
+              style={({ pressed }) => [styles.headerBadge, { backgroundColor: colors.surfaceRaised }, pressed && styles.pressed]}
+            >
+              <Feather name="menu" size={20} color={colors.primary} />
+            </Pressable>
           </View>
 
           <View style={styles.categoryRow}>
@@ -553,6 +576,169 @@ export default function Index() {
           <Feather name="minus" size={14} color={colors.mutedForeground} />
         </View>
       </View>
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <View style={styles.menuBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} />
+          <View
+            style={[
+              styles.menuPanel,
+              { backgroundColor: colors.card, borderColor: colors.border, marginTop: topInset + 54 },
+            ]}
+          >
+            <View style={styles.menuHeader}>
+              {menuSection !== 'overview' ? (
+                <Pressable
+                  testID="menu-back"
+                  accessibilityLabel="Back to app menu"
+                  onPress={() => setMenuSection('overview')}
+                  hitSlop={10}
+                  style={styles.menuBack}
+                >
+                  <Feather name="arrow-left" size={19} color={colors.foreground} />
+                </Pressable>
+              ) : (
+                <View style={styles.menuBack} />
+              )}
+              <Text style={styles.menuTitle}>{activeMenuTitle}</Text>
+              <Pressable
+                testID="close-app-menu"
+                accessibilityLabel="Close app menu"
+                onPress={() => setMenuOpen(false)}
+                hitSlop={10}
+                style={styles.menuBack}
+              >
+                <Feather name="x" size={20} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+
+            {menuSection === 'overview' ? (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.menuList}>
+                <View style={[styles.menuIntro, { backgroundColor: colors.surfaceSoft }]}>
+                  <View style={[styles.menuIntroIcon, { backgroundColor: colors.secondary }]}>
+                    <Feather name="compass" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.menuIntroCopy}>
+                    <Text style={styles.menuIntroTitle}>Wheel Spinner</Text>
+                    <Text style={styles.menuIntroText}>A simple decision wheel for meals, movement, and weekends.</Text>
+                  </View>
+                </View>
+                {menuItems.slice(1).map((item) => (
+                  <Pressable
+                    key={item.id}
+                    testID={`menu-${item.id}`}
+                    onPress={() => openMenuSection(item.id)}
+                    style={({ pressed }) => [styles.menuItem, { borderBottomColor: colors.border }, pressed && styles.pressed]}
+                  >
+                    <View style={[styles.menuItemIcon, { backgroundColor: colors.surfaceRaised }]}>
+                      <Feather name={item.icon} size={17} color={colors.primary} />
+                    </View>
+                    <Text style={styles.menuItemLabel}>{item.label}</Text>
+                    <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.menuContent}>
+                {menuSection === 'privacy' && (
+                  <>
+                    <Text style={styles.menuLead}>Wheel Spinner is designed to work without an account.</Text>
+                    <View style={styles.infoBlock}>
+                      <InfoRow icon="hard-drive" title="Stored on this device" text="Your custom wheel choices are saved locally on your device." />
+                      <InfoRow icon="user-x" title="No account required" text="The app does not ask for a name, email address, profile, or login." />
+                      <InfoRow icon="share-2" title="Sharing is user-controlled" text="A result only leaves the app when you choose to share it through your device share sheet." />
+                      <InfoRow icon="image" title="Ads disclosure" text="This build reserves space for a future banner. No live ad SDK is connected yet." />
+                    </View>
+                    <Text style={styles.menuNote}>Before publishing, add a hosted privacy policy URL to the Google Play listing and complete the Data safety form.</Text>
+                  </>
+                )}
+                {menuSection === 'terms' && (
+                  <>
+                    <Text style={styles.menuLead}>Wheel Spinner is a casual decision-making tool for everyday choices.</Text>
+                    <View style={styles.infoBlock}>
+                      <InfoRow icon="check" title="Use of the app" text="Use the wheels for personal meal, exercise, and weekend planning." />
+                      <InfoRow icon="edit-3" title="Your custom choices" text="You are responsible for the custom options you enter into the app." />
+                      <InfoRow icon="heart" title="Exercise reminder" text="Choose activities that are appropriate for your health and fitness level." />
+                    </View>
+                    <Text style={styles.menuNote}>Have a legal professional review and replace this summary with your final terms before publishing.</Text>
+                  </>
+                )}
+                {menuSection === 'support' && (
+                  <>
+                    <Text style={styles.menuLead}>Make it easy for users and Google Play reviewers to reach the developer.</Text>
+                    <View style={styles.infoBlock}>
+                      <InfoRow icon="mail" title="Support email" text="Add your developer support email here before submitting the store listing." />
+                      <InfoRow icon="globe" title="Website" text="Add an optional developer or product website to your Play Store listing." />
+                      <InfoRow icon="trash-2" title="Data deletion" text="Custom choices can be removed from the Custom wheel inside the app." />
+                    </View>
+                    <View style={[styles.actionNotice, { backgroundColor: colors.secondary }]}>
+                      <Feather name="alert-circle" size={17} color={colors.primary} />
+                      <Text style={styles.actionNoticeText}>Developer action needed: add a real support contact before publishing.</Text>
+                    </View>
+                  </>
+                )}
+                {menuSection === 'playStore' && (
+                  <>
+                    <Text style={styles.menuLead}>A quick in-app checklist for the information Google Play typically requests.</Text>
+                    <View style={styles.checklist}>
+                      {[
+                        { label: 'App icon', status: 'Ready' },
+                        { label: 'Privacy policy URL', status: 'Add URL' },
+                        { label: 'Data safety form', status: 'Complete in Play Console' },
+                        { label: 'Content rating', status: 'Complete questionnaire' },
+                        { label: 'Target audience', status: 'Declare audience' },
+                        { label: 'Ads declaration', status: 'Declare if AdMob is enabled' },
+                        { label: 'Screenshots & store copy', status: 'Add listing assets' },
+                        { label: 'Support email', status: 'Required from developer' },
+                      ].map((item) => (
+                        <View key={item.label} style={[styles.checklistRow, { borderBottomColor: colors.border }]}>
+                          <Feather
+                            name={item.status === 'Ready' ? 'check-circle' : 'circle'}
+                            size={17}
+                            color={item.status === 'Ready' ? colors.primary : colors.mutedForeground}
+                          />
+                          <Text style={styles.checklistLabel}>{item.label}</Text>
+                          <Text style={[styles.checklistStatus, { color: item.status === 'Ready' ? colors.primary : colors.mutedForeground }]}>
+                            {item.status}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                    <Text style={styles.menuNote}>This checklist helps organize the submission; Google Play approval is determined in Play Console and cannot be guaranteed by an in-app menu.</Text>
+                  </>
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+function InfoRow({
+  icon,
+  title,
+  text,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  text: string;
+}) {
+  const colors = useColors();
+  return (
+    <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+      <View style={[styles.infoIcon, { backgroundColor: colors.surfaceRaised }]}>
+        <Feather name={icon} size={16} color={colors.primary} />
+      </View>
+      <View style={styles.infoCopy}>
+        <Text style={styles.infoTitle}>{title}</Text>
+        <Text style={styles.infoText}>{text}</Text>
+      </View>
     </View>
   );
 }
@@ -614,6 +800,35 @@ const styles = StyleSheet.create({
   adBannerContainer: { minHeight: 60, paddingHorizontal: 14, paddingTop: 6, borderTopWidth: 1 },
   adBannerSlot: { height: 50, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   adBannerLabel: { fontFamily: 'Inter_500Medium', fontSize: 10, letterSpacing: 0.4 },
+  menuBackdrop: { flex: 1, paddingHorizontal: 16 },
+  menuPanel: { borderWidth: 1, borderRadius: 22, overflow: 'hidden', maxHeight: '82%' },
+  menuHeader: { minHeight: 58, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  menuBack: { width: 24, alignItems: 'flex-start', justifyContent: 'center' },
+  menuTitle: { color: '#F7F8FA', fontFamily: 'Inter_700Bold', fontSize: 16 },
+  menuList: { paddingHorizontal: 15, paddingBottom: 14 },
+  menuIntro: { padding: 14, borderRadius: 16, flexDirection: 'row', gap: 12, marginBottom: 8 },
+  menuIntroIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  menuIntroCopy: { flex: 1 },
+  menuIntroTitle: { color: '#F7F8FA', fontFamily: 'Inter_700Bold', fontSize: 15 },
+  menuIntroText: { color: '#8FA4B8', fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, marginTop: 3 },
+  menuItem: { minHeight: 59, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  menuItemIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  menuItemLabel: { flex: 1, color: '#F7F8FA', fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  menuContent: { paddingHorizontal: 17, paddingBottom: 18 },
+  menuLead: { color: '#F7F8FA', fontFamily: 'Inter_500Medium', fontSize: 14, lineHeight: 21, marginBottom: 13 },
+  infoBlock: { borderRadius: 16, overflow: 'hidden' },
+  infoRow: { flexDirection: 'row', gap: 11, paddingVertical: 13, borderBottomWidth: 1 },
+  infoIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  infoCopy: { flex: 1 },
+  infoTitle: { color: '#F7F8FA', fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  infoText: { color: '#8FA4B8', fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, marginTop: 3 },
+  menuNote: { color: '#8FA4B8', fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, marginTop: 16 },
+  actionNotice: { marginTop: 17, borderRadius: 13, padding: 12, flexDirection: 'row', gap: 9, alignItems: 'flex-start' },
+  actionNoticeText: { flex: 1, color: '#F7F8FA', fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 17 },
+  checklist: { borderRadius: 16, overflow: 'hidden' },
+  checklistRow: { minHeight: 48, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  checklistLabel: { flex: 1, color: '#F7F8FA', fontFamily: 'Inter_500Medium', fontSize: 12 },
+  checklistStatus: { maxWidth: 118, textAlign: 'right', fontFamily: 'Inter_500Medium', fontSize: 10, lineHeight: 14 },
   pressed: { opacity: 0.78 },
   buttonPressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
 });
