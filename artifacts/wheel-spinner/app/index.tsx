@@ -539,6 +539,20 @@ export default function Index() {
           </View>
         </View>
       </ScrollView>
+      <View
+        testID="admob-banner-slot"
+        accessibilityLabel="AdMob banner placement"
+        style={[
+          styles.adBannerContainer,
+          { backgroundColor: colors.surfaceSoft, borderTopColor: colors.border, paddingBottom: bottomInset },
+        ]}
+      >
+        <View style={[styles.adBannerSlot, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}>
+          <Feather name="minus" size={14} color={colors.mutedForeground} />
+          <Text style={[styles.adBannerLabel, { color: colors.mutedForeground }]}>Ad banner space</Text>
+          <Feather name="minus" size={14} color={colors.mutedForeground} />
+        </View>
+      </View>
     </View>
   );
 }
@@ -597,6 +611,9 @@ const styles = StyleSheet.create({
   resultSummaryValue: { fontFamily: 'Inter_600SemiBold', fontSize: 14, marginTop: 4 },
   shareButton: { borderWidth: 1, minHeight: 40, paddingHorizontal: 14, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
   shareButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  adBannerContainer: { minHeight: 60, paddingHorizontal: 14, paddingTop: 6, borderTopWidth: 1 },
+  adBannerSlot: { height: 50, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  adBannerLabel: { fontFamily: 'Inter_500Medium', fontSize: 10, letterSpacing: 0.4 },
   pressed: { opacity: 0.78 },
   buttonPressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
 });
