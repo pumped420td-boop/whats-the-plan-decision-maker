@@ -103,14 +103,14 @@ const EXERCISE: WheelConfig = {
     'Run',
     'Yoga',
     'Cycle',
-    'Swim',
-    'Strength',
-    'Dance',
-    'Stretch',
-    'Pilates',
-    'Hike',
-    'Rowing',
-    'Kickboxing',
+    'Push-ups',
+    'Squats',
+    'Lunges',
+    'Jumping jacks',
+    'Plank',
+    'Burpees',
+    'Crunches',
+    'High knees',
   ],
   color: '#83B86B',
 };
@@ -213,7 +213,9 @@ function Wheel({
               const end = start + segmentAngle;
               const labelAngle = start + segmentAngle / 2;
               const labelPoint = polarToCartesian(center, labelAngle, radius * 0.64);
-              const fontSize = choices.length > 7 ? 10 : choices.length > 5 ? 11 : 12;
+              const readableAngle = labelAngle > 90 && labelAngle < 270 ? labelAngle + 180 : labelAngle;
+              const fontSize = choices.length > 11 ? 9 : choices.length > 7 ? 10 : choices.length > 5 ? 11 : 12;
+              const label = choice.length > 13 ? `${choice.slice(0, 12)}…` : choice;
               return (
                 <G key={`${choice}-${index}`}>
                   <Path
@@ -230,9 +232,9 @@ function Wheel({
                     fontWeight="700"
                     textAnchor="middle"
                     alignmentBaseline="middle"
-                    transform={`rotate(${labelAngle} ${labelPoint.x} ${labelPoint.y})`}
+                    transform={`rotate(${readableAngle} ${labelPoint.x} ${labelPoint.y})`}
                   >
-                    {choice.length > 14 ? `${choice.slice(0, 13)}…` : choice}
+                    {label}
                   </SvgText>
                 </G>
               );
