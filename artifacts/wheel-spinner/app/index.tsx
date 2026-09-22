@@ -23,6 +23,7 @@ import { useColors } from '@/hooks/useColors';
 
 type Category = 'meals' | 'exercise' | 'weekends';
 type MealKey = 'breakfast' | 'lunch' | 'dinner' | 'custom';
+type WheelMode = 'preset' | 'custom';
 type MenuSection = 'overview' | 'privacy' | 'terms' | 'support' | 'playStore';
 
 type WheelConfig = {
@@ -143,6 +144,11 @@ const STORAGE_KEY = '@wheel-spinner/custom-options';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const WHEEL_SIZE = Math.min(SCREEN_WIDTH - 56, 340);
 
+function normalizeCustomOptions(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string').slice(0, 12);
+}
+
 function polarToCartesian(center: number, angle: number, radius: number) {
   const radians = ((angle - 90) * Math.PI) / 180;
   return {
@@ -186,7 +192,9 @@ function Wheel({
     const winner = Math.floor(Math.random() * choices.length);
     onSpin(winner);
     const targetOffset = 360 - winner * segmentAngle - segmentAngle / 2;
-    const nextRotation = currentRotation.current + 360 * 5 + targetOffset;
+    const currentOffset = ((currentRotation.current % 360) + 360) % 360;
+    const correction = (targetOffset - currentOffset + 360) % 360;
+    const nextRotation = currentRotation.current + 360 * 5 + correction;
     currentRotation.current = nextRotation;
     Animated.timing(rotation, {
       toValue: nextRotation,
@@ -333,7 +341,13 @@ export default function Index() {
   const insets = useSafeAreaInsets();
   const [category, setCategory] = useState<Category>('meals');
   const [meal, setMeal] = useState<MealKey>('breakfast');
-  const [customOptions, setCustomOptions] = useState<string[]>([]);
+  const [exerciseMode, setExerciseMode] = useState<WheelMode>('preset');
+  const [weekendMode, setWeekendMode] = useState<WheelMode>('preset');
+  const [customOptions, setCustomOptions] = useState<Record<Category, string[]>>({
+    meals: [],
+    exercise: [],
+    weekends: [],
+  });
   const [newOption, setNewOption] = useState('');
   const [result, setResult] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
@@ -344,7 +358,20 @@ export default function Index() {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((stored) => {
-        if (stored) setCustomOptions(JSON.parse(stored) as string[]);
+        if (!stored) return;
+        const parsed: unknown = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setCustomOptions((current) => ({ ...current, meals: normalizeCustomOptions(parsed) }));
+          return;
+        }
+        if (parsed && typeof parsed === 'object') {
+          const saved = parsed as Partial<Record<Category, unknown>>;
+          setCustomOptions({
+            meals: normalizeCustomOptions(saved.meals),
+            exercise: normalizeCustomOptions(saved.exercise),
+            weekends: normalizeCustomOptions(saved.weekends),
+          });
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -354,19 +381,41 @@ export default function Index() {
   }, [customOptions]);
 
   const config = useMemo<WheelConfig>(() => {
-    if (category === 'exercise') return EXERCISE;
-    if (category === 'weekends') return WEEKENDS;
+    if (category === 'exercise') {
+      if (exerciseMode === 'custom') {
+        return {
+          id: 'exercise-custom',
+          title: 'Your exercise wheel',
+          subtitle: 'Add movements, routines, or challenges',
+          choices: customOptions.exercise,
+          color: '#83B86B',
+        };
+      }
+      return EXERCISE;
+    }
+    if (category === 'weekends') {
+      if (weekendMode === 'custom') {
+        return {
+          id: 'weekend-custom',
+          title: 'Your weekend wheel',
+          subtitle: 'Add your own plans and adventures',
+          choices: customOptions.weekends,
+          color: '#E97451',
+        };
+      }
+      return WEEKENDS;
+    }
     if (meal === 'custom') {
       return {
-        id: 'custom',
+        id: 'meal-custom',
         title: 'Your custom wheel',
         subtitle: 'Add anything you want to choose between',
-        choices: customOptions,
+        choices: customOptions.meals,
         color: '#F6C65B',
       };
     }
     return MEALS[meal];
-  }, [category, customOptions, meal]);
+  }, [category, customOptions, exerciseMode, meal, weekendMode]);
 
   const selectCategory = (next: Category) => {
     setCategory(next);
@@ -376,6 +425,13 @@ export default function Index() {
 
   const selectMeal = (next: MealKey) => {
     setMeal(next);
+    setResult(null);
+    setSpinning(false);
+  };
+
+  const selectMode = (next: WheelMode) => {
+    if (category === 'exercise') setExerciseMode(next);
+    if (category === 'weekends') setWeekendMode(next);
     setResult(null);
     setSpinning(false);
   };
@@ -395,19 +451,26 @@ export default function Index() {
 
   const addOption = () => {
     const cleaned = newOption.trim();
-    if (!cleaned || customOptions.includes(cleaned) || customOptions.length >= 12) return;
-    setCustomOptions((current) => [...current, cleaned]);
+    const activeOptions = customOptions[category];
+    if (!cleaned || activeOptions.includes(cleaned) || activeOptions.length >= 12) return;
+    setCustomOptions((current) => ({ ...current, [category]: [...current[category], cleaned] }));
     setNewOption('');
     Keyboard.dismiss();
   };
 
   const removeOption = (option: string) => {
-    setCustomOptions((current) => current.filter((item) => item !== option));
+    setCustomOptions((current) => ({
+      ...current,
+      [category]: current[category].filter((item) => item !== option),
+    }));
   };
 
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
-  const emptyCustom = category === 'meals' && meal === 'custom' && config.choices.length === 0;
+  const customSelected =
+    category === 'meals' ? meal === 'custom' : category === 'exercise' ? exerciseMode === 'custom' : weekendMode === 'custom';
+  const activeCustomOptions = customOptions[category];
+  const emptyCustom = customSelected && config.choices.length === 0;
   const menuItems: Array<{ id: MenuSection; label: string; icon: keyof typeof Feather.glyphMap }> = [
     { id: 'overview', label: 'About the app', icon: 'info' },
     { id: 'privacy', label: 'Privacy & data', icon: 'shield' },
@@ -476,6 +539,46 @@ export default function Index() {
               ))}
             </View>
           )}
+          {category !== 'meals' && (
+            <View style={styles.mealSelector}>
+              <Pressable
+                testID={`${category}-preset`}
+                onPress={() => selectMode('preset')}
+                style={({ pressed }) => [
+                  styles.mealChip,
+                  { backgroundColor: (category === 'exercise' ? exerciseMode : weekendMode) === 'preset' ? colors.secondary : 'transparent' },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.mealChipText,
+                    { color: (category === 'exercise' ? exerciseMode : weekendMode) === 'preset' ? colors.primary : colors.mutedForeground },
+                  ]}
+                >
+                  {category === 'exercise' ? 'Exercises' : 'Weekend plans'}
+                </Text>
+              </Pressable>
+              <Pressable
+                testID={`${category}-custom`}
+                onPress={() => selectMode('custom')}
+                style={({ pressed }) => [
+                  styles.mealChip,
+                  { backgroundColor: (category === 'exercise' ? exerciseMode : weekendMode) === 'custom' ? colors.secondary : 'transparent' },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.mealChipText,
+                    { color: (category === 'exercise' ? exerciseMode : weekendMode) === 'custom' ? colors.primary : colors.mutedForeground },
+                  ]}
+                >
+                  Custom
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
           <View style={styles.sectionHeader}>
             <View>
@@ -502,11 +605,11 @@ export default function Index() {
             )}
           </View>
 
-          {category === 'meals' && meal === 'custom' && (
+          {customSelected && (
             <View style={[styles.customPanel, { backgroundColor: colors.surfaceSoft, borderColor: colors.border }]}>
               <View style={styles.customHeadingRow}>
                 <View>
-                  <Text style={styles.customTitle}>Your options</Text>
+                  <Text style={styles.customTitle}>{category === 'meals' ? 'Your meal options' : category === 'exercise' ? 'Your exercise options' : 'Your weekend options'}</Text>
                   <Text style={styles.customSubtitle}>Up to 12 choices</Text>
                 </View>
                 <Feather name="edit-3" size={17} color={colors.mutedForeground} />
@@ -531,15 +634,15 @@ export default function Index() {
                   <Feather name="plus" size={21} color={colors.primaryForeground} />
                 </Pressable>
               </View>
-              {customOptions.length > 0 && (
+              {activeCustomOptions.length > 0 && (
                 <FlatList
-                  data={customOptions}
+                  data={activeCustomOptions}
                   scrollEnabled={false}
                   keyExtractor={(item) => item}
                   contentContainerStyle={styles.optionList}
                   renderItem={({ item }) => (
                     <View style={[styles.optionRow, { backgroundColor: colors.card }]}>
-                      <View style={[styles.optionDot, { backgroundColor: WHEEL_COLORS[customOptions.indexOf(item) % WHEEL_COLORS.length] }]} />
+                      <View style={[styles.optionDot, { backgroundColor: WHEEL_COLORS[activeCustomOptions.indexOf(item) % WHEEL_COLORS.length] }]} />
                       <Text style={styles.optionText}>{item}</Text>
                       <Pressable onPress={() => removeOption(item)} hitSlop={10} accessibilityLabel={`Remove ${item}`}>
                         <Feather name="x" size={16} color={colors.mutedForeground} />
