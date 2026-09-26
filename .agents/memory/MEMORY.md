@@ -1,0 +1,1 @@
+- [Expo Go QR routing](expo-go-qr-routing.md) — Expo 57 monorepos need Metro rooted at the mobile package and the Replit artifact URL prefix stripped before bundle resolution.
